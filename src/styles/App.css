@@ -1,1 +1,5 @@
+.rbc-day-bg {
+  pointer-events: auto !important;
+  z-index: 10;
+}
 
