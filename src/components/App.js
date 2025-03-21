@@ -1,72 +1,103 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
-import "react-big-calendar/lib/css/react-big-calendar.css";
 import Popup from "reactjs-popup";
+import "react-big-calendar/lib/css/react-big-calendar.css";
 import "reactjs-popup/dist/index.css";
 
 const localizer = momentLocalizer(moment);
 
 const EventTracker = () => {
   const [events, setEvents] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [showPopup, setShowPopup] = useState(false);
-  const [eventTitle, setEventTitle] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [filter, setFilter] = useState("all"); // all, past, upcoming
+  const [newEvent, setNewEvent] = useState({ title: "", location: "", start: new Date() });
 
-  const handleSelectSlot = ({ start }) => {
-    setSelectedDate(start);
-    setShowPopup(true);
+  useEffect(() => {
+    setEvents([
+      { id: 1, title: "Past Event", location: "Venue 1", start: moment().subtract(2, "days").toDate() },
+      { id: 2, title: "Upcoming Event", location: "Venue 2", start: moment().add(3, "days").toDate() }
+    ]);
+  }, []);
+
+  const openCreatePopup = (slotInfo) => {
+    setNewEvent({ title: "", location: "", start: slotInfo.start });
+    document.querySelector(".event-popup").click();
   };
 
   const addEvent = () => {
-    if (eventTitle) {
-      setEvents([...events, { title: eventTitle, start: selectedDate, end: selectedDate }]);
-      setShowPopup(false);
-      setEventTitle("");
-    }
+    setEvents([...events, { ...newEvent, id: events.length + 1 }]);
+    document.querySelector(".close-popup").click();
   };
 
-  const filterEvents = (type) => {
-    const now = new Date();
-    switch (type) {
-      case "past":
-        return events.filter((event) => event.start < now);
-      case "future":
-        return events.filter((event) => event.start >= now);
-      default:
-        return events;
-    }
+  const openEditPopup = (event) => {
+    setSelectedEvent(event);
+    document.querySelector(".edit-popup").click();
+  };
+
+  const editEvent = () => {
+    setEvents(events.map((ev) => (ev.id === selectedEvent.id ? selectedEvent : ev)));
+    document.querySelector(".close-edit-popup").click();
+  };
+
+  const deleteEvent = () => {
+    setEvents(events.filter((ev) => ev.id !== selectedEvent.id));
+    document.querySelector(".close-edit-popup").click();
+  };
+
+  const getFilteredEvents = () => {
+    return events.filter((event) => {
+      if (filter === "past") return moment(event.start).isBefore(moment(), "day");
+      if (filter === "upcoming") return moment(event.start).isSameOrAfter(moment(), "day");
+      return true;
+    });
   };
 
   return (
     <div>
-      <h2>Event Tracker Calendar</h2>
-      <div>
-        <button onClick={() => setEvents(filterEvents("all"))}>All</button>
-        <button onClick={() => setEvents(filterEvents("past"))}>Past</button>
-        <button onClick={() => setEvents(filterEvents("future"))}>Upcoming</button>
-      </div>
+      <button className="btn" onClick={() => setFilter("all")}>All Events</button>
+      <button className="btn" onClick={() => setFilter("past")}>Past Events</button>
+      <button className="btn" onClick={() => setFilter("upcoming")}>Upcoming Events</button>
+
       <Calendar
         localizer={localizer}
-        events={events}
+        events={getFilteredEvents()}
         startAccessor="start"
-        endAccessor="end"
-        style={{ height: 500 }}
+        endAccessor="start"
+        style={{ height: 500, margin: "20px" }}
+        onSelectSlot={openCreatePopup}
         selectable
-        onSelectSlot={handleSelectSlot}
+        onSelectEvent={openEditPopup}
+        eventPropGetter={(event) => ({
+          style: {
+            backgroundColor: moment(event.start).isBefore(moment(), "day") ? "rgb(222, 105, 135)" : "rgb(140, 189, 76)"
+          }
+        })}
       />
-      <Popup open={showPopup} closeOnDocumentClick onClose={() => setShowPopup(false)}>
+
+      {/* Create Event Popup */}
+      <Popup trigger={<button className="event-popup" style={{ display: "none" }}></button>} modal>
         <div>
-          <h3>Create Event</h3>
-          <input
-            type="text"
-            placeholder="Event Title"
-            value={eventTitle}
-            onChange={(e) => setEventTitle(e.target.value)}
-          />
-          <button onClick={addEvent}>Add Event</button>
+          <h2>Create Event</h2>
+          <input placeholder="Event Title" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} />
+          <input placeholder="Event Location" value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} />
+          <button className="mm-popup__box__footer__right-space mm-popup__btn" onClick={addEvent}>Save</button>
+          <button className="close-popup" onClick={() => document.querySelector(".event-popup").click()}>Close</button>
         </div>
       </Popup>
+
+      {/* Edit Event Popup */}
+      {selectedEvent && (
+        <Popup trigger={<button className="edit-popup" style={{ display: "none" }}></button>} modal>
+          <div>
+            <h2>Edit Event</h2>
+            <input value={selectedEvent.title} onChange={(e) => setSelectedEvent({ ...selectedEvent, title: e.target.value })} />
+            <button className="mm-popup__btn--info" onClick={editEvent}>Save</button>
+            <button className="mm-popup__btn--danger" onClick={deleteEvent}>Delete</button>
+            <button className="close-edit-popup" onClick={() => document.querySelector(".edit-popup").click()}>Close</button>
+          </div>
+        </Popup>
+      )}
     </div>
   );
 };
